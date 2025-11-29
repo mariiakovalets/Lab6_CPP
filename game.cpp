@@ -1,125 +1,113 @@
 #include "game.h"
+#include "random_generator.h"
 #include <iostream>
 #include <vector>
 
-
-Game::Game() : gen_(std::random_device{}()) {
-    std::uniform_int_distribution<int> d(1, 10);
-    number1_ = d(gen_);
-    number2_ = d(gen_);
+Game::Game() {
+    number1_ = random_int(1, 10);
+    number2_ = random_int(1, 10);
     
     initial_sum_ = number1_ + number2_;
-    target_sum_ = initial_sum_ * 10;
+    target_sum_ = initial_sum_ * target_multiplier;
     
     player_last_actions_[0] = std::nullopt;
     player_last_actions_[1] = std::nullopt;
     
-    std::cout << "Початкові числа: " << number1_ << ", " 
-              << number2_ << std::endl;
-    std::cout << "Початкова сума: " << initial_sum_ << std::endl;
-    std::cout << "Мета: " << target_sum_ << std::endl;
+    std::cout << "Initial numbers: [" << number1_ << ", " << number2_ << "]" << std::endl;
+    std::cout << "Initial sum: " << initial_sum_ << std::endl;
+    std::cout << "Target sum: " << target_sum_ << std::endl;
     std::cout << std::endl;
 }
 
-std::optional<int> Game::TryApplyAction(int value, Action action) const {
-    if (action == Action::DivideNumberBy3 && value % 3 != 0) {
+std::optional<int> Game::try_apply_action(int value, Action action) const {
+    if (action == Action::divide_number_by3 && value % 3 != 0) {
         return std::nullopt;
     }
     
     switch (action) {
-        case Action::IncrementNumber:
+        case Action::increment_number:
             return value + 1;
-        case Action::MultiplyNumberBy2:
+        case Action::multiply_number_by2:
             return value * 2;
-        case Action::DivideNumberBy3:
+        case Action::divide_number_by3:
             return value / 3;
     }
     
     return std::nullopt;
 }
 
-Action Game::ChooseRandomAction(int player_id) {
-    constexpr std::array action_candidates{
-        Action::IncrementNumber,
-        Action::MultiplyNumberBy2,
-        Action::DivideNumberBy3
-    };
+Action Game::choose_action(int player_id) {
+    std::vector<Action> available_actions;
     
-    std::vector<double> action_weights;
-    action_weights.reserve(action_candidates.size());
+    const auto& last_action = player_last_actions_[player_id - 1];
     
-    for (const Action action : action_candidates) {
-        const bool action_is_new = !player_last_actions_[player_id - 1].has_value() ||
-                                   action != player_last_actions_[player_id - 1].value();
+    for (Action action : {Action::increment_number, 
+                          Action::multiply_number_by2, 
+                          Action::divide_number_by3}) {
         
-        if (action_is_new) {
-            action_weights.push_back(1.0);
+        bool is_new_action = !last_action.has_value() || 
+                             action != last_action.value();
+        
+        if (action == Action::divide_number_by3) {
+            bool can_divide = (number1_ % 3 == 0) || (number2_ % 3 == 0);
+            if (is_new_action && can_divide) {
+                available_actions.push_back(action);
+            }
         } else {
-            action_weights.push_back(0.0);
+            if (is_new_action) {
+                available_actions.push_back(action);
+            }
         }
     }
-
-    std::discrete_distribution<std::size_t> dist(action_weights.begin(), 
-                                                 action_weights.end());
     
-    return action_candidates[dist(gen_)];
+    int random_index = random_int(0, available_actions.size() - 1);
+    return available_actions[random_index];
 }
 
-
-void Game::MakeMove(int player_id) {
-    std::uniform_int_distribution<int> num_dist(0, 1);
+void Game::make_move(int player_id) {
+    Action action = choose_action(player_id);
     
-    std::optional<int> result;
-    Action action;
-    bool apply_to_first;
+    bool apply_to_first = (random_int(0, 1) == 0);
+    int current_value = apply_to_first ? number1_ : number2_;
     
-    int attempts = 0;
-    while (!result.has_value() && attempts < 10) {
-        action = ChooseRandomAction(player_id);
-        apply_to_first = (num_dist(gen_) == 0);
-        
-        int current_value = apply_to_first ? number1_ : number2_;
-        result = TryApplyAction(current_value, action);
+    std::optional<int> result = try_apply_action(current_value, action);
     
-        if (!result.has_value()) {
-            apply_to_first = !apply_to_first;
-            current_value = apply_to_first ? number1_ : number2_;
-            result = TryApplyAction(current_value, action);
+    if (!result.has_value()) {
+        apply_to_first = !apply_to_first;
+        current_value = apply_to_first ? number1_ : number2_;
+        result = try_apply_action(current_value, action);
+    }
+    
+    if (result.has_value()) {
+        if (apply_to_first) {
+            number1_ = result.value();
+        } else {
+            number2_ = result.value();
         }
         
-        ++attempts;
+        player_last_actions_[player_id - 1] = action;
+        
+        std::cout << "Player" << player_id << ": " 
+                  << action_to_string(action, apply_to_first) << std::endl;
+        std::cout << "   Current numbers: [" << number1_ << ", " << number2_ << "]\n";
+        std::cout << "   Sum: " << get_sum() << std::endl;
     }
-    
-    if (apply_to_first) {
-        number1_ = result.value();
-    } else {
-        number2_ = result.value();
-    }
-    
-    player_last_actions_[player_id - 1] = action;
-    
-    std::cout << "Гравець " << player_id  << " " 
-              << ActionToString(action, apply_to_first) << std::endl;
-    std::cout << "   Числа: [" << number1_ << ", " << number2_  << "]"
-              << ", сума: " << GetSum() << std::endl;
 }
 
-bool Game::CheckWinner() const {
-    return GetSum() >= target_sum_;
+bool Game::check_winner() const {
+    return get_sum() >= target_sum_;
 }
 
-
-std::string Game::ActionToString(Action action, bool is_first_number) const {
-    std::string num = is_first_number ? "перше" : "друге";
+std::string Game::action_to_string(Action action, bool is_first_number) const {
+    std::string num = is_first_number ? "the first" : "the second";
     
     switch (action) {
-        case Action::IncrementNumber:
-            return "Додав 1 до " + num + " числа";
-        case Action::MultiplyNumberBy2:
-            return "Помножив " + num + " число на 2";
-        case Action::DivideNumberBy3:
-            return "Поділив " + num + " число на 3";
+        case Action::increment_number:
+            return "Added 1 to " + num;
+        case Action::multiply_number_by2:
+            return "Multiplied " + num + " by 2";
+        case Action::divide_number_by3:
+            return "Divided " + num + " by 3";
     }
-    
-    return "Невідома дія";
+    return "Unknown action";
 }

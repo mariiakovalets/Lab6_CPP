@@ -2,14 +2,13 @@
 #include "game.h"
 #include <iostream>
 
-
 bool Player::in_progress() const {
     return coro && !coro.done();
 }
 
 bool Player::move_next() {
     if (!coro) {
-        throw std::runtime_error("coroutine is destroyed");
+        throw std::runtime_error("Corutin is destroyed");
     }
     coro.resume();
     return !coro.done();
@@ -25,13 +24,12 @@ Player::~Player() {
     }
 }
 
-
-Player CreatePlayer(std::shared_ptr<Game> game, int player_id) {
+Player create_player(std::shared_ptr<Game> game, int player_id) {
     while (true) {
-        game->MakeMove(player_id);
+        game->make_move(player_id);
         
-        if (game->CheckWinner()) {
-            std::cout << "\n Гравець " << player_id << " переміг!" << std::endl;
+        if (game->check_winner()) {
+            std::cout << "\nPlayer " << player_id << " won!" << std::endl;
             co_return;
         }
         

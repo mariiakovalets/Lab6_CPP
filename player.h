@@ -47,4 +47,4 @@ private:
     handle coro;
 };
 
-Player CreatePlayer(std::shared_ptr<Game> game, int player_id); 
+Player create_player(std::shared_ptr<Game> game, int player_id);

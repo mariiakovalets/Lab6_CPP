@@ -16,4 +16,4 @@ else()
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 endif()
 
-add_executable(laba6 main.cpp game.cpp player.cpp)
+add_executable(laba6 main.cpp game.cpp player.cpp random_generator.cpp)
