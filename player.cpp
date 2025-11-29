@@ -8,7 +8,7 @@ bool Player::in_progress() const {
 
 bool Player::move_next() {
     if (!coro) {
-        throw std::runtime_error("Corutin is destroyed");
+        throw std::runtime_error("Corutine is destroyed");
     }
     coro.resume();
     return !coro.done();
